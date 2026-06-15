@@ -1,0 +1,33 @@
+:root {
+  --neon-green: #0f0;
+  --neon-blue: #0ff;
+  --neon-red: #f00;
+  --neon-purple: #f0f;
+  --dark-bg: #030305;
+  --hud-bg: rgba(10, 20, 15, 0.6);
+  --hud-border: 1px solid rgba(0, 255, 0, 0.4);
+  --hud-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--dark-bg);
+  color: var(--neon-green);
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+h1, h2, h3, h4, p {
+  margin: 0;
+}

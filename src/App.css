@@ -1,0 +1,349 @@
+.app-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ===========================
+   SYSTEM STATUS (top-left)
+   =========================== */
+.system-status {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  font-size: 12px;
+  text-shadow: 0 0 5px var(--neon-green);
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* ===========================
+   HUD FRAME — Softer, less CCTV
+   =========================== */
+.hud-frame {
+  position: relative;
+  width: 800px;
+  height: 600px;
+  max-width: 90vw;
+  max-height: 75vh;
+  background: rgba(0, 10, 5, 0.3);
+  border: 1px solid rgba(0, 255, 0, 0.25);
+  border-radius: 24px;
+  box-shadow:
+    0 0 30px rgba(0, 255, 0, 0.15),
+    0 0 80px rgba(0, 255, 0, 0.05),
+    inset 0 0 40px rgba(0, 255, 0, 0.05);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  z-index: 2;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+/* High speed — border gets more intense and shifts to blue/purple */
+.hud-frame.speed-high {
+  border-color: rgba(0, 200, 255, 0.5);
+  box-shadow:
+    0 0 40px rgba(0, 200, 255, 0.3),
+    0 0 100px rgba(100, 0, 255, 0.15),
+    inset 0 0 50px rgba(0, 200, 255, 0.08);
+}
+
+.hud-frame.speed-extreme {
+  border-color: rgba(180, 0, 255, 0.6);
+  box-shadow:
+    0 0 50px rgba(180, 0, 255, 0.4),
+    0 0 120px rgba(0, 150, 255, 0.2),
+    inset 0 0 60px rgba(180, 0, 255, 0.1);
+}
+
+/* ===========================
+   VIEWPORT (Camera Area)
+   =========================== */
+.viewport {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+/* ===========================
+   GRID OVERLAY — Subtle sci-fi grid
+   =========================== */
+.hud-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  background:
+    linear-gradient(rgba(0, 255, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 0, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  opacity: 0.6;
+}
+
+/* ===========================
+   CORNER BRACKETS (decorative)
+   =========================== */
+.hud-corners {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 6;
+}
+.hud-corners::before {
+  content: '';
+  position: absolute;
+  top: 10px; left: 10px;
+  width: 40px; height: 40px;
+  border-top: 2px solid rgba(0,255,0,0.5);
+  border-left: 2px solid rgba(0,255,0,0.5);
+}
+.hud-corners::after {
+  content: '';
+  position: absolute;
+  bottom: 10px; right: 10px;
+  width: 40px; height: 40px;
+  border-bottom: 2px solid rgba(0,255,0,0.5);
+  border-right: 2px solid rgba(0,255,0,0.5);
+}
+
+/* ===========================
+   RETICLE — targeting circle
+   =========================== */
+.reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 160px;
+  height: 160px;
+  border: 1px dashed rgba(0, 255, 0, 0.25);
+  border-radius: 50%;
+  z-index: 5;
+  pointer-events: none;
+  transition: border-color 0.3s;
+}
+.reticle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -15px;
+  right: -15px;
+  height: 1px;
+  background: rgba(0, 255, 0, 0.15);
+}
+.reticle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -15px;
+  bottom: -15px;
+  width: 1px;
+  background: rgba(0, 255, 0, 0.15);
+}
+
+/* ===========================
+   CONTROLS (Bottom Bar)
+   =========================== */
+.controls-container {
+  position: absolute;
+  bottom: 20px;
+  width: 100%;
+  padding: 0 40px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.speed-display {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  text-shadow: 0 0 10px var(--neon-green);
+  letter-spacing: 3px;
+  transition: color 0.3s, text-shadow 0.3s;
+}
+
+.speed-display.speed-high {
+  color: var(--neon-blue);
+  text-shadow: 0 0 15px var(--neon-blue);
+}
+
+.speed-display.speed-extreme {
+  color: var(--neon-purple);
+  text-shadow: 0 0 20px var(--neon-purple);
+}
+
+.slider-wrapper {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* ===========================
+   SLIDER — Millennium Falcon Lever
+   =========================== */
+.hyper-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 10px;
+  background: rgba(0, 255, 0, 0.15);
+  border: 1px solid rgba(0,255,0,0.3);
+  border-radius: 10px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+.hyper-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 36px;
+  background: var(--dark-bg);
+  border: 2px solid var(--neon-green);
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 0 12px var(--neon-green);
+  transition: all 0.2s;
+}
+.hyper-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green);
+  transform: scale(1.1);
+}
+.hyper-slider::-moz-range-thumb {
+  width: 24px;
+  height: 36px;
+  background: var(--dark-bg);
+  border: 2px solid var(--neon-green);
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 0 12px var(--neon-green);
+}
+
+/* ===========================
+   WARNING TEXT
+   =========================== */
+.warning-text {
+  color: var(--neon-red);
+  text-shadow: 0 0 8px var(--neon-red);
+  animation: blink 0.8s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Screen shake for warning — applied via JS className */
+.screen-shake {
+  animation: shake 0.15s infinite;
+}
+@keyframes shake {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-3px, 2px); }
+  50% { transform: translate(2px, -3px); }
+  75% { transform: translate(-2px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* Intense shake at extreme speed */
+.screen-shake-extreme {
+  animation: shakeHard 0.1s infinite;
+}
+@keyframes shakeHard {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(-5px, 3px) rotate(-0.5deg); }
+  50% { transform: translate(4px, -4px) rotate(0.5deg); }
+  75% { transform: translate(-3px, 2px) rotate(-0.3deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* ===========================
+   GLITCH EFFECT (HUD distortion at high speed)
+   =========================== */
+.glitch-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 8;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+.glitch-overlay.active {
+  opacity: 1;
+  animation: glitchFlicker 0.3s infinite;
+}
+
+@keyframes glitchFlicker {
+  0%   { opacity: 0; }
+  5%   { opacity: 0.7; }
+  10%  { opacity: 0; }
+  15%  { opacity: 0.4; }
+  20%  { opacity: 0; }
+  80%  { opacity: 0; }
+  85%  { opacity: 0.6; }
+  90%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* ===========================
+   MODE BUTTONS (Right Side)
+   =========================== */
+.mode-buttons {
+  position: absolute;
+  right: -70px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hud-btn {
+  background: rgba(0, 20, 0, 0.7);
+  border: 1px solid rgba(0,255,0,0.4);
+  color: var(--neon-green);
+  padding: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.15);
+  transition: all 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.hud-btn:hover {
+  background: var(--neon-green);
+  color: var(--dark-bg);
+  box-shadow: 0 0 25px var(--neon-green);
+  transform: scale(1.15);
+}
+.hud-btn.active {
+  background: rgba(255, 0, 80, 0.8);
+  border-color: rgba(255, 0, 80, 0.8);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(255, 0, 80, 0.6);
+}
+.hud-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
