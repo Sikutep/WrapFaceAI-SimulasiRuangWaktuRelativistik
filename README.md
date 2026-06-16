@@ -36,12 +36,19 @@ Aplikasi ini mendasarkan keseluruhan *shader* 3D dan *audio engine*-nya pada rum
 
 ### 1. Faktor Lorentz ($\gamma$)
 Faktor Lorentz digunakan untuk menghitung seberapa besar distorsi ruang yang dialami oleh pengamat. Dalam kode (TypeScript), ini dihitung sebelum dikirim ke GPU:
-$$ \gamma = \frac{1}{\sqrt{1 - \frac{v^2}{c^2}}} $$
+
+$$
+\gamma = \frac{1}{\sqrt{1 - \frac{v^2}{c^2}}}
+$$
+
 *Di mana $v$ adalah kecepatan (*velocity slider*), dan $c$ dinormalisasi menjadi 1.*
 
 ### 2. Kontraksi Panjang Fisik (Lorentz Contraction 3D)
 Benda yang bergerak sangat cepat akan tampak memendek (gepeng) searah dengan arah gerakannya. Di dalam *Vertex Shader*, *PlaneGeometry* padat (*128x128 vertices*) dimanipulasi secara fisik pada sumbu X menggunakan:
-$$ L = L_0 \sqrt{1 - v^2} $$
+
+$$
+L = L_0 \sqrt{1 - v^2}
+$$
 ```glsl
 // Kode Vertex Shader
 float contraction = sqrt(1.0 - pow(uSpeed, 2.0));
@@ -50,7 +57,10 @@ newPosition.x *= contraction;
 
 ### 3. Parabolic Spacetime Funnel (Kelengkungan Dimensi Z-Warp)
 Ruang visual ditarik masuk menembus kedalaman layar (sumbu Z negatif) dengan simulasi efek *wormhole funneling* berdasarkan jarak radial ke titik pusat layar:
-$$ Z_{warp} = - \frac{v^3 \times 800}{(d + 0.2)} $$
+
+$$
+Z_{warp} = - \frac{v^3 \times 800}{(d + 0.2)}
+$$
 ```glsl
 // Kode Vertex Shader
 float dist = length(uv - 0.5) * 2.0;
@@ -60,7 +70,11 @@ newPosition.z -= (1.0 / (dist + 0.2)) * warpFactor;
 
 ### 4. Efek Doppler Relativistik (Pergeseran Biru/Merah)
 Saat Anda bergerak mendekati sumber cahaya, gelombang memampat ke frekuensi tinggi (Blueshift). Saat menjauh, gelombang merenggang ke frekuensi rendah (Redshift). Kami mengkonversinya menjadi perubahan filter RGB (*Neon Tinting*):
-$$ f_{obs} = f_{emit} \sqrt{\frac{1 + \beta}{1 - \beta}} $$
+
+$$
+f_{obs} = f_{emit} \sqrt{\frac{1 + \beta}{1 - \beta}}
+$$
+
 Dalam simulasi ini, matriks `dopplerFactor` dari *TensorFlow FaceMesh* diubah menjadi interpolasi warna merah dan biru pekat pada *Fragment Shader*.
 
 ### 5. Filter Frekuensi Doppler Audio (Web Audio DSP)
@@ -70,7 +84,10 @@ Sama halnya dengan cahaya, gelombang suara dimodifikasi menggunakan algoritma *B
 
 ### 6. Relativistic Particle Acceleration (Hyperspace)
 Laju partikel bintang di sekeliling Anda (yang ditarik di `StarfieldCanvas`) tidak bertambah secara linear, melainkan secara eksponensial pangkat 4 saat mendekati kecepatan cahaya, mensimulasikan efek tarikan ruang:
-$$ V_{star} = 1 + (v^4 \times 800) $$
+
+$$
+V_{star} = 1 + (v^4 \times 800)
+$$
 
 ---
 
