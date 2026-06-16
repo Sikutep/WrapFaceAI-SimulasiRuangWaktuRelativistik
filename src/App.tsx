@@ -200,38 +200,30 @@ function App() {
             </div>
           ) : null}
 
-          {/* Raw video element: Fully visible (opacity 1) but placed strictly behind the WebGL Canvas (zIndex 1) so it never gets throttled */}
+          {/* Hidden video for face tracking (useWebcam needs this ref) */}
           <video
             ref={videoRef}
             autoPlay playsInline muted
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 1, pointerEvents: 'none', zIndex: 1 }}
+            style={{ position: 'absolute', width: 1, height: 1, opacity: 0.01, pointerEvents: 'none', zIndex: -1 }}
           />
 
-          {!isCalibrating && isReady && isFaceModelReady && (
-            <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-              <div style={{
-                flex: isDuetMode && remoteStream ? 1 : 'none',
-                width: isDuetMode && remoteStream ? '50%' : '100%',
-                height: '100%', position: 'relative'
-              }}>
-                <SpacetimeCanvas
-                  videoElement={videoRef.current}
-                  speed={speed}
-                  dopplerFactor={dopplerFactor}
-                />
+          {/* SpacetimeCanvas creates its OWN video from the stream — no ref dependency */}
+          <SpacetimeCanvas
+            speed={speed}
+            dopplerFactor={dopplerFactor}
+            stream={stream}
+          />
+
+          {isDuetMode && remoteStream && (
+            <div style={{ position: 'absolute', top: 0, right: 0, width: '30%', height: '30%', zIndex: 10, border: '2px solid rgba(0,255,0,0.4)', borderRadius: '12px', overflow: 'hidden' }}>
+              <video
+                ref={remoteVideoRef}
+                autoPlay playsInline
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <div style={{ position: 'absolute', bottom: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', padding: '2px 6px', color: 'var(--neon-green)', fontSize: '10px', fontFamily: 'Orbitron', borderRadius: '4px' }}>
+                NORMAL TIME
               </div>
-              {isDuetMode && remoteStream && (
-                <div style={{ flex: 1, width: '50%', height: '100%', position: 'relative', borderLeft: '2px solid rgba(0,255,0,0.3)' }}>
-                  <video
-                    ref={remoteVideoRef}
-                    autoPlay playsInline
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                  <div style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(0,0,0,0.6)', padding: '4px 8px', color: 'var(--neon-green)', fontSize: '11px', fontFamily: 'Orbitron', borderRadius: '4px' }}>
-                    NORMAL TIME
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>

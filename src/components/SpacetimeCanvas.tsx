@@ -1,15 +1,11 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 interface SpacetimeCanvasProps {
-  videoElement: HTMLVideoElement | null;
   speed: number;
   dopplerFactor: number;
+  stream: MediaStream | null;
 }
-
-// ============================================================
-//  ULTIMATE RELATIVISTIC SHADER — Wormhole + Doppler Neon
-// ============================================================
 
 const VERTEX_SHADER = `
   varying vec2 vUv;
@@ -31,12 +27,10 @@ const FRAGMENT_SHADER = `
 
   varying vec2 vUv;
 
-  // ---- helpers (defined OUTSIDE main) ----
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
   }
 
-  // GPU-native bounds check: returns 1.0 if in [0,1], 0.0 if out
   float inBounds(vec2 c) {
     vec2 s = step(0.0, c) * step(c, vec2(1.0));
     return s.x * s.y;
@@ -46,40 +40,27 @@ const FRAGMENT_SHADER = `
     vec2 uv = vUv;
     float spd = uSpeed;
     float t = uTime;
-
     vec2 center = uv - 0.5;
 
-    // ===================================
-    // 1) LORENTZ CONTRACTION + WORMHOLE WARP
-    // ===================================
+    // 1) LORENTZ CONTRACTION + WORMHOLE
     float squeeze = 1.0 / uGamma;
     center.x /= max(squeeze, 0.01);
-
-    // Wormhole barrel distortion
     float warpPower = spd * spd * 0.6;
     float r = length(center);
     float warpFactor = 1.0 + warpPower * r * r;
     warpFactor += sin(t * 3.0) * spd * spd * 0.02;
     center *= warpFactor;
-
-    // Vertical stretch
     center.y *= 1.0 + spd * spd * 0.15;
-
     vec2 warpedUv = center + 0.5;
 
-    // ===================================
-    // 2) CHROMATIC ABERRATION (Radial: Blue inward, Red outward)
-    // ===================================
+    // 2) CHROMATIC ABERRATION
     float aberStrength = spd * spd * 0.035 + abs(uDoppler) * 0.02;
     vec2 radialDir = normalize(warpedUv - 0.5 + vec2(0.0001));
     float radialDist = length(warpedUv - 0.5);
-
     vec2 redUv   = warpedUv + radialDir * aberStrength * radialDist;
     vec2 greenUv = warpedUv;
     vec2 blueUv  = warpedUv - radialDir * aberStrength * radialDist;
 
-    // Sample ALL channels unconditionally (GPU-safe),
-    // then mask by bounds using mix
     vec4 redSample   = texture2D(tDiffuse, clamp(redUv,   0.0, 1.0));
     vec4 greenSample = texture2D(tDiffuse, clamp(greenUv, 0.0, 1.0));
     vec4 blueSample  = texture2D(tDiffuse, clamp(blueUv,  0.0, 1.0));
@@ -88,38 +69,29 @@ const FRAGMENT_SHADER = `
     float greenMask = inBounds(greenUv);
     float blueMask  = inBounds(blueUv);
 
-    float finalR = redSample.r   * redMask;
-    float finalG = greenSample.g * greenMask;
-    float finalB = blueSample.b  * blueMask;
-
-    vec3 color = vec3(finalR, finalG, finalB);
-
+    vec3 color = vec3(
+      redSample.r   * redMask,
+      greenSample.g * greenMask,
+      blueSample.b  * blueMask
+    );
     float isVisible = max(redMask, max(greenMask, blueMask));
 
-    // ===================================
-    // 3) DOPPLER COLOR TINTING
-    // ===================================
+    // 3) DOPPLER TINTING
     float totalDoppler = spd * 0.6 + uDoppler * 0.8;
     vec3 blueTint = vec3(0.15, 0.3, 0.9);
     vec3 redTint  = vec3(0.9, 0.2, 0.05);
     float tintStrength = abs(totalDoppler) * 0.4;
     vec3 tint = mix(redTint, blueTint, clamp(totalDoppler + 0.5, 0.0, 1.0));
     color = mix(color, color + tint * tintStrength, min(spd * 1.5, 1.0) * isVisible);
-
-    // Boost saturation
     float lum = dot(color, vec3(0.299, 0.587, 0.114));
     color = mix(vec3(lum), color, 1.0 + spd * 0.8);
 
-    // ===================================
-    // 4) NEON BLOOM
-    // ===================================
+    // 4) BLOOM
     float bloom = smoothstep(0.4, 0.9, lum) * spd * 0.6 * isVisible;
     vec3 bloomColor = mix(vec3(0.0, 0.6, 1.0), vec3(0.6, 0.0, 1.0), spd);
     color += bloomColor * bloom;
 
-    // ===================================
     // 5) HYPERSPACE STREAKS
-    // ===================================
     float streakPower = smoothstep(0.25, 0.99, spd);
     streakPower *= streakPower;
     if (streakPower > 0.0) {
@@ -138,9 +110,7 @@ const FRAGMENT_SHADER = `
       color += streakColor * streaks * streakPower * 0.5;
     }
 
-    // ===================================
     // 6) VIGNETTE
-    // ===================================
     float vigStrength = 0.3 + spd * 1.2;
     vec2 vigUv = vUv - 0.5;
     float vig = 1.0 - dot(vigUv, vigUv) * vigStrength * 2.5;
@@ -148,17 +118,13 @@ const FRAGMENT_SHADER = `
     vec3 vigColor = mix(vec3(0.0), vec3(0.0, 0.02, 0.08), spd);
     color = mix(vigColor, color, vig);
 
-    // ===================================
     // 7) SCANLINES
-    // ===================================
     float scanFreq = uResolution.y * 1.2;
     float scan = sin(vUv.y * scanFreq + t * 2.0) * 0.5 + 0.5;
     scan = mix(1.0, scan, 0.06 + spd * 0.08);
     color *= scan;
 
-    // ===================================
-    // 8) VOID BOUNDARY GLOW
-    // ===================================
+    // 8) VOID GLOW
     float voidGlow = (1.0 - isVisible);
     if (voidGlow > 0.0) {
       vec2 edgeDist = abs(warpedUv - 0.5);
@@ -171,9 +137,7 @@ const FRAGMENT_SHADER = `
       color += boundaryColor * glow * 0.7 * voidGlow;
     }
 
-    // ===================================
     // 9) GLITCH
-    // ===================================
     if (spd > 0.6) {
       float glitchChance = hash(vec2(floor(t * 20.0), floor(vUv.y * 40.0)));
       if (glitchChance > 0.97) {
@@ -184,9 +148,7 @@ const FRAGMENT_SHADER = `
       }
     }
 
-    // ===================================
-    // 10) FILM GRAIN
-    // ===================================
+    // 10) GRAIN
     float grain = hash(vUv * t * 137.0) * 0.04 * spd;
     color += vec3(grain);
 
@@ -195,131 +157,157 @@ const FRAGMENT_SHADER = `
   }
 `;
 
-export function SpacetimeCanvas({ videoElement, speed, dopplerFactor }: SpacetimeCanvasProps) {
+export function SpacetimeCanvas({ speed, dopplerFactor, stream }: SpacetimeCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const stateRef = useRef<{
-    renderer: THREE.WebGLRenderer;
-    scene: THREE.Scene;
-    camera: THREE.OrthographicCamera;
-    material: THREE.ShaderMaterial;
-    plane: THREE.Mesh;
-    offscreenCanvas: HTMLCanvasElement;
-    offscreenCtx: CanvasRenderingContext2D;
-    videoTexture: THREE.CanvasTexture;
-    animationId: number;
-    clock: THREE.Clock;
-  } | null>(null);
-
   const speedRef = useRef(speed);
   const dopplerRef = useRef(dopplerFactor);
   speedRef.current = speed;
   dopplerRef.current = dopplerFactor;
 
-  const initScene = useCallback(() => {
-    if (!containerRef.current || !videoElement) return;
-
-    if (stateRef.current) {
-      cancelAnimationFrame(stateRef.current.animationId);
-      if (containerRef.current.contains(stateRef.current.renderer.domElement)) {
-        containerRef.current.removeChild(stateRef.current.renderer.domElement);
-      }
-      stateRef.current.renderer.dispose();
-      stateRef.current.material.dispose();
-      stateRef.current.plane.geometry.dispose();
-      stateRef.current = null;
-    }
-
-    const w = containerRef.current.clientWidth || 640;
-    const h = containerRef.current.clientHeight || 480;
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-w/2, w/2, h/2, -h/2, 0.1, 10);
-    camera.position.z = 1;
-
-    const renderer = new THREE.WebGLRenderer({ preserveDrawingBuffer: true });
-    renderer.setSize(w, h);
-    renderer.setPixelRatio(1);
-    containerRef.current.appendChild(renderer.domElement);
-
-    const videoTexture = new THREE.VideoTexture(videoElement);
-    videoTexture.minFilter = THREE.LinearFilter;
-    videoTexture.magFilter = THREE.LinearFilter;
-    videoTexture.colorSpace = THREE.SRGBColorSpace;
-    videoTexture.generateMipmaps = false;
-
-    const material = new THREE.ShaderMaterial({
-      uniforms: {
-        tDiffuse:    { value: videoTexture },
-        uSpeed:      { value: 0.0 },
-        uGamma:      { value: 1.0 },
-        uDoppler:    { value: 0.0 },
-        uTime:       { value: 0.0 },
-        uResolution: { value: new THREE.Vector2(w, h) }
-      },
-      vertexShader: VERTEX_SHADER,
-      fragmentShader: FRAGMENT_SHADER
-    });
-
-    const geometry = new THREE.PlaneGeometry(w, h);
-    const plane = new THREE.Mesh(geometry, material);
-    scene.add(plane);
-
-    function animate() {
-      const aid = requestAnimationFrame(animate);
-      if (stateRef.current) stateRef.current.animationId = aid;
-
-      const s = speedRef.current;
-      const g = s < 1.0 ? 1.0 / Math.sqrt(1.0 - s * s) : 100.0;
-      material.uniforms.uSpeed.value = s;
-      material.uniforms.uGamma.value = g;
-      material.uniforms.uDoppler.value = dopplerRef.current;
-      material.uniforms.uTime.value = performance.now() / 1000;
-
-      renderer.render(scene, camera);
-    }
-
-    const firstFrameId = requestAnimationFrame(animate);
-
-    stateRef.current = {
-      renderer, scene, camera, material, plane,
-      offscreenCanvas: null as any, offscreenCtx: null as any,
-      videoTexture: videoTexture as any, animationId: firstFrameId, clock: null as any
-    };
-  }, [videoElement]);
-
   useEffect(() => {
-    initScene();
+    if (!containerRef.current || !stream) return;
 
-    const ro = new ResizeObserver(() => {
-      if (!stateRef.current || !containerRef.current) return;
-      const w = containerRef.current.clientWidth;
-      const h = containerRef.current.clientHeight;
-      if (w === 0 || h === 0) return;
-      const { renderer, camera, plane, material } = stateRef.current;
-      renderer.setSize(w, h);
-      camera.left = -w/2; camera.right = w/2;
-      camera.top = h/2; camera.bottom = -h/2;
-      camera.updateProjectionMatrix();
-      plane.geometry.dispose();
-      plane.geometry = new THREE.PlaneGeometry(w, h);
-      material.uniforms.uResolution.value.set(w, h);
+    const container = containerRef.current;
+    let animId = 0;
+    let destroyed = false;
+    let renderer: THREE.WebGLRenderer | null = null;
+    let video: HTMLVideoElement | null = null;
+
+    console.log('[SpacetimeCanvas] Init stream tracks:', stream.getTracks().length);
+
+    // 1) Create PRIVATE video element
+    video = document.createElement('video');
+    video.setAttribute('playsinline', '');
+    video.setAttribute('autoplay', '');
+    video.muted = true;
+    video.srcObject = stream;
+    // Make sure Chrome actually decodes the video by keeping it in the DOM but invisible
+    video.style.cssText = 'position:fixed;top:0;left:0;width:320px;height:240px;opacity:0.001;pointer-events:none;z-index:-9999;';
+    document.body.appendChild(video);
+
+    video.play().catch(err => {
+      console.error('[SpacetimeCanvas] video.play() failed:', err);
     });
-    if (containerRef.current) ro.observe(containerRef.current);
+
+    function waitForVideo() {
+      if (destroyed || !video) return;
+      if (video.readyState < 2 || video.videoWidth === 0) {
+        setTimeout(waitForVideo, 100);
+        return;
+      }
+      console.log('[SpacetimeCanvas] ✅ VIDEO READY: ' + video.videoWidth + 'x' + video.videoHeight);
+      buildScene();
+    }
+
+    function buildScene() {
+      if (destroyed || !containerRef.current || !video) return;
+
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w === 0 || h === 0) {
+        setTimeout(buildScene, 100);
+        return;
+      }
+
+      console.log('[SpacetimeCanvas] Container:', w, 'x', h);
+
+      // Standard Orthographic Setup mapped 1:1 to pixels
+      const scene = new THREE.Scene();
+      const camera = new THREE.OrthographicCamera(w / -2, w / 2, h / 2, h / -2, 1, 1000);
+      camera.position.z = 100;
+
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      container.appendChild(renderer.domElement);
+      renderer.domElement.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
+
+      // NATIVE THREE.js VideoTexture! (Handles all updates natively)
+      const texture = new THREE.VideoTexture(video);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          tDiffuse:    { value: texture },
+          uSpeed:      { value: 0.0 },
+          uGamma:      { value: 1.0 },
+          uDoppler:    { value: 0.0 },
+          uTime:       { value: 0.0 },
+          uResolution: { value: new THREE.Vector2(w, h) }
+        },
+        vertexShader: VERTEX_SHADER,
+        fragmentShader: FRAGMENT_SHADER,
+        transparent: true
+      });
+
+      // Plane matches pixel dimensions of container
+      const geometry = new THREE.PlaneGeometry(w, h);
+      const plane = new THREE.Mesh(geometry, material);
+      scene.add(plane);
+
+      // Resize observer
+      const ro = new ResizeObserver(() => {
+        if (destroyed || !renderer || !containerRef.current) return;
+        const nw = container.clientWidth;
+        const nh = container.clientHeight;
+        if (nw === 0 || nh === 0) return;
+        
+        renderer.setSize(nw, nh);
+        camera.left = nw / -2;
+        camera.right = nw / 2;
+        camera.top = nh / 2;
+        camera.bottom = nh / -2;
+        camera.updateProjectionMatrix();
+        
+        plane.geometry.dispose();
+        plane.geometry = new THREE.PlaneGeometry(nw, nh);
+        material.uniforms.uResolution.value.set(nw, nh);
+      });
+      ro.observe(container);
+
+      let frames = 0;
+      function animate() {
+        if (destroyed) return;
+        animId = requestAnimationFrame(animate);
+
+        frames++;
+        if (frames === 1) console.log('[SpacetimeCanvas] First render frame!');
+
+        let s = speedRef.current;
+        if (isNaN(s)) s = 0.0;
+        let g = s < 1.0 ? 1.0 / Math.sqrt(1.0 - s * s) : 100.0;
+        if (isNaN(g)) g = 1.0;
+        let d = dopplerRef.current;
+        if (isNaN(d)) d = 0.0;
+
+        material.uniforms.uSpeed.value = s;
+        material.uniforms.uGamma.value = g;
+        material.uniforms.uDoppler.value = d;
+        material.uniforms.uTime.value = performance.now() / 1000;
+
+        renderer!.render(scene, camera);
+      }
+      animate();
+    }
+
+    waitForVideo();
 
     return () => {
-      ro.disconnect();
-      if (stateRef.current) {
-        cancelAnimationFrame(stateRef.current.animationId);
-        if (containerRef.current && containerRef.current.contains(stateRef.current.renderer.domElement)) {
-          containerRef.current.removeChild(stateRef.current.renderer.domElement);
-        }
-        stateRef.current.renderer.dispose();
-        stateRef.current.material.dispose();
-        stateRef.current.plane.geometry.dispose();
-        stateRef.current = null;
+      destroyed = true;
+      cancelAnimationFrame(animId);
+      if (video && document.body.contains(video)) {
+        document.body.removeChild(video);
+      }
+      if (renderer && container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
+        renderer.dispose();
       }
     };
-  }, [initScene]);
+  }, [stream]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 2 }} />;
+  // zIndex 10 ensures it is ABOVE all the HUD grid/lines
+  return <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 10 }} />;
 }
