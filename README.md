@@ -1,126 +1,130 @@
-# WrapFaceAI - Simulasi Ruang Waktu Relativistik
+# WrapFaceAI - Simulasi Ruang Waktu Relativistik (CGI Level)
 
-**WrapFaceAI** adalah aplikasi web eksperimental tingkat lanjut yang menggabungkan **pelacakan wajah AI secara real-time** dengan **shader WebGL sinematik** dan **Web Audio API** dinamis. Aplikasi ini secara harfiah mensimulasikan fisika benda yang bergerak mendekati kecepatan cahaya (Teori Relativitas Khusus Albert Einstein) langsung di dalam browser Anda.
+**WrapFaceAI** adalah aplikasi web eksperimental tingkat lanjut yang menggabungkan **pelacakan wajah AI secara real-time** dengan **True 3D Cinematic WebGL Shader** dan **Web Audio API** dinamis. Aplikasi ini secara harfiah mensimulasikan fisika benda yang bergerak mendekati kecepatan cahaya (Teori Relativitas Khusus Albert Einstein) layaknya adegan film *Interstellar* langsung di dalam browser Anda.
 
-Semua pemrosesan, baik kecerdasan buatan (AI) maupun grafis, dilakukan 100% di sisi klien (Client-Side) secara lokal untuk menjamin privasi dan latensi sangat rendah.
+Semua pemrosesan, baik kecerdasan buatan (AI) maupun grafika 3D, dilakukan 100% di sisi klien (Client-Side) secara lokal untuk menjamin privasi dan latensi sangat rendah.
 
 ![Status](https://img.shields.io/badge/Status-Eksperimental-red.svg) ![React](https://img.shields.io/badge/React-18.0-blue.svg) ![ThreeJS](https://img.shields.io/badge/Three.js-WebGL-black.svg) ![TensorFlow.js](https://img.shields.io/badge/TensorFlow.js-FaceMesh-orange.svg)
 
 ---
 
-## Teori Fisika yang Diaplikasikan
+## Cinematic Progression (Kecepatan Cahaya)
 
-Aplikasi ini tidak hanya menggunakan filter visual biasa, tetapi didasarkan pada rumus-rumus fisika nyata. Semakin dekat nilai *slider velocity* dengan `1.0c` (kecepatan cahaya), semakin nyata efek ini diterapkan:
+Seiring tuas kecepatan (*velocity slider*) dinaikkan, WrapFaceAI mensimulasikan efek visual G-Force dan kelengkungan dimensi secara bertahap:
+
+### 1. Velocity Normal (0.000c)
+*Kondisi ruang-waktu normal. Grid dan reticle aktif, AI melacak pergerakan wajah secara real-time.*
+![Kecepatan Normal](./docs/0.00c.png)
+
+### 2. Akselerasi Menengah
+*Bintang-bintang mulai memanjang membentuk garis lintasan (Particle Streaks), dan efek Aberasi Kromatik (Pemisahan spektrum RGB) mulai muncul di pinggiran corong visual.*
+![Akselerasi Menengah](./docs/0.44c.png)
+
+### 3. Distorsi Relativistik
+*Hukum Lorentz mulai memipihkan ruang secara horizontal, warna memudar menjadi biru pekat, pinggiran lensa dilingkupi bayangan hitam gravitasi (Event Horizon).*
+![Distorsi Relativistik](./docs/0.61c.png)
+
+### 4. Extreme G-Force & 3D Warp
+*Layar terguncang hebat (Cinematic Turbulence). Bidang koordinat wajah ditarik masuk ke sumbu kedalaman (Z-Axis) negatif membentuk corong dimensi. Audio mendengung ekstrem!*
+![Extreme Warp](./docs/0.84c.png)
+
+---
+
+## Teori Fisika & Matematika yang Diaplikasikan
+
+Aplikasi ini mendasarkan keseluruhan *shader* 3D dan *audio engine*-nya pada rumus fisika nyata yang dikonversi menjadi algoritma matematika di dalam kode:
 
 ### 1. Faktor Lorentz ($\gamma$)
-Faktor Lorentz digunakan untuk menghitung seberapa besar distorsi ruang dan waktu yang dialami oleh pengamat. Rumus yang diimplementasikan di dalam `SpacetimeCanvas`:
-
+Faktor Lorentz digunakan untuk menghitung seberapa besar distorsi ruang yang dialami oleh pengamat. Dalam kode (TypeScript), ini dihitung sebelum dikirim ke GPU:
 $$ \gamma = \frac{1}{\sqrt{1 - \frac{v^2}{c^2}}} $$
+*Di mana $v$ adalah kecepatan (*velocity slider*), dan $c$ dinormalisasi menjadi 1.*
 
-Di mana:
-- $v$ adalah kecepatan (velocity slider).
-- $c$ adalah kecepatan cahaya (dalam simulasi ini dinormalisasi menjadi 1).
+### 2. Kontraksi Panjang Fisik (Lorentz Contraction 3D)
+Benda yang bergerak sangat cepat akan tampak memendek (gepeng) searah dengan arah gerakannya. Di dalam *Vertex Shader*, *PlaneGeometry* padat (*128x128 vertices*) dimanipulasi secara fisik pada sumbu X menggunakan:
+$$ L = L_0 \sqrt{1 - v^2} $$
+```glsl
+// Kode Vertex Shader
+float contraction = sqrt(1.0 - pow(uSpeed, 2.0));
+newPosition.x *= contraction;
+```
 
-### 2. Kontraksi Panjang (Lorentz Contraction)
-Benda yang bergerak sangat cepat akan tampak memendek (gepeng) searah dengan arah gerakannya.
-Di dalam WebGL Shader, ini disimulasikan dengan mengompresi koordinat horizontal wajah (`center.x /= gamma`).
+### 3. Parabolic Spacetime Funnel (Kelengkungan Dimensi Z-Warp)
+Ruang visual ditarik masuk menembus kedalaman layar (sumbu Z negatif) dengan simulasi efek *wormhole funneling* berdasarkan jarak radial ke titik pusat layar:
+$$ Z_{warp} = - \frac{v^3 \times 800}{(d + 0.2)} $$
+```glsl
+// Kode Vertex Shader
+float dist = length(uv - 0.5) * 2.0;
+float warpFactor = pow(uSpeed, 3.0) * 800.0;
+newPosition.z -= (1.0 / (dist + 0.2)) * warpFactor;
+```
 
-### 3. Efek Doppler Relativistik (Pergeseran Merah/Biru)
-Saat Anda bergerak mendekati sumber cahaya, gelombang cahaya memampat ke frekuensi tinggi (Blueshift). Saat menjauh, gelombang merenggang ke frekuensi rendah (Redshift). Kami menangkap pergerakan wajah Anda menggunakan AI dan menerjemahkannya ke dalam dispersi spektrum warna.
+### 4. Efek Doppler Relativistik (Pergeseran Biru/Merah)
+Saat Anda bergerak mendekati sumber cahaya, gelombang memampat ke frekuensi tinggi (Blueshift). Saat menjauh, gelombang merenggang ke frekuensi rendah (Redshift). Kami mengkonversinya menjadi perubahan filter RGB (*Neon Tinting*):
+$$ f_{obs} = f_{emit} \sqrt{\frac{1 + \beta}{1 - \beta}} $$
+Dalam simulasi ini, matriks `dopplerFactor` dari *TensorFlow FaceMesh* diubah menjadi interpolasi warna merah dan biru pekat pada *Fragment Shader*.
+
+### 5. Filter Frekuensi Doppler Audio (Web Audio DSP)
+Sama halnya dengan cahaya, gelombang suara dimodifikasi menggunakan algoritma *Biquad Filter* berdasarkan vektor kecepatan kepala Anda:
+- **Blueshift (Maju):** $f_{highpass} = 1000 + (D \times 5000) \text{ Hz}$
+- **Redshift (Mundur):** $f_{lowpass} = 400 - (|D| \times 300) \text{ Hz}$
+
+### 6. Relativistic Particle Acceleration (Hyperspace)
+Laju partikel bintang di sekeliling Anda (yang ditarik di `StarfieldCanvas`) tidak bertambah secara linear, melainkan secara eksponensial pangkat 4 saat mendekati kecepatan cahaya, mensimulasikan efek tarikan ruang:
+$$ V_{star} = 1 + (v^4 \times 800) $$
 
 ---
 
 ## Fitur Utama
 
-### 1. Shader Sinematik (WebGL/Three.js)
-Jantung dari visual aplikasi ini adalah Fragment Shader GLSL kustom dengan lebih dari 10 lapis efek:
-- **Wormhole Warp**: Selain kontraksi Lorentz, seluruh ruangan di latar belakang ikut melengkung seperti tertarik masuk ke dalam lubang hitam (Barrel Distortion bergradien eksponensial).
-- **Aberasi Kromatik Radial**: Pemisahan channel RGB di mana channel biru ditarik ke dalam (Blueshift) dan merah ditarik keluar (Redshift) berdasarkan vektor radial dari pusat layar.
-- **Doppler Neon Glow**: Cahaya neon yang beradaptasi dengan kecepatan. Berubah menjadi *cyan* terang saat melaju cepat, atau merah saat mengerem mendadak.
-- **Hyperspace Streaks**: Efek partikel garis-garis kecepatan cahaya ala *Star Wars* yang keluar dari titik pusat layar saat menembus `0.30c`.
-- **Distorsi Glitch & Film Grain**: Getaran layar dan noise film saat menembus *G-Force* ekstrim (> `0.80c`).
+### 1. True 3D Cinematic Pipeline (WebGL/Three.js)
+Jantung visualnya telah berevolusi dari 2D Shader biasa menjadi **3D Vertex Manipulation**:
+- **Dense Mesh Projection**: Memproyeksikan video web-cam ke atas kanvas *PlaneGeometry* berisi 16.384 *vertex* secara *real-time*.
+- **Perspective Z-Warping**: Bukannya memanipulasi gambar 2D, shader secara harfiah mendorong koordinat 3D ke belakang layar, menciptakan ilusi lorong (*Wormhole*) nyata.
+- **Gravitational Vignette & Aberration**: Cincin kegelapan absolut dan pergeseran ekstrem *Channel RGB* ketika kecepatan mendekati kecepatan cahaya.
 
 ### 2. AI Doppler Tracking (TensorFlow.js)
-Memanfaatkan `@tensorflow-models/face-landmarks-detection` (MediaPipe FaceMesh) secara unik:
-- Mengukur diferensial luas *bounding box* wajah Anda dari frame ke frame.
-- Mengubah diferensial tersebut menjadi matriks percepatan (mundur/maju).
-- Kecepatan gerakan kepala Anda memicu *micro-bursts* warna dan modulasi frekuensi audio seketika.
+Memanfaatkan MediaPipe FaceMesh untuk:
+- Mengukur diferensial area (*bounding box*) wajah.
+- Menerjemahkannya menjadi matriks percepatan (maju/mundur) yang menyetel efek suara dan visual *Doppler* seketika.
 
-### 3. Mesin Audio Ruang Angkasa (Web Audio API)
-Efek audio generatif tingkat lanjut tanpa menggunakan aset `.mp3` apa pun, 100% diproses langsung dari mikrofon Anda:
-- **Filter Frekuensi Doppler**: Jika Anda memajukan kepala, suara berubah cempreng berfrekuensi tinggi (`highpass`). Jika mundur, suara menjadi bergema rendah (`lowpass`).
-- **Space Echo (Feedback Loop)**: Menerapkan `DelayNode` berlapis yang memantulkan suara Anda terus-menerus. Gema ini makin intens saat Anda bergerak mendekati kecepatan cahaya.
-- **Hyperdrive Engine Hum**: Sebuah `OscillatorNode` (gelombang *Sawtooth*) yang menghasilkan frekuensi bass `40Hz-120Hz`. Mirip suara deru mesin warp yang beresonansi di dalam pesawat ruang angkasa.
+### 3. Web Audio API (Doppler Engine)
+Efek audio ruang angkasa tanpa file `.mp3`, murni pemrosesan DSP:
+- **Doppler Filter**: Suara mendadak melengking cempreng (highpass) saat kepala maju, bergema *bass* (lowpass) saat mundur.
+- **Space Reverb & Stutter**: Suara terputus-putus (*tremolo glitch*) dan bergema hebat layaknya transmisi sinyal alien saat *slider* menyentuh `0.90c`.
+- **Hyperdrive Hum**: Osilator bass berat (*Sawtooth*) menderu, dari `40Hz` hingga melengking tajam di kecepatan puncak.
 
-### 4. Mode Tantangan (Gamification)
-- Mode di mana tuas akselerasi otomatis ditarik hingga mentok `0.99c`.
-- Anda harus menahan wajah Anda agar tetap tenang menghadapi G-Force virtual.
-- Sistem akan merender **Sertifikat Kelulusan Spacetime** bergaya Sci-Fi dalam format `.png` siap unduh menggunakan `html2canvas`.
-
-### 5. Mode Spacetime Duet (WebRTC/PeerJS)
-- Fitur *teleconference* peer-to-peer terdesentralisasi murni.
-- Lihat kamera teman Anda dalam aliran "waktu normal" sementara Anda terjebak di dalam lubang cacing.
+### 4. Mode Tantangan & Telekonferensi P2P
+- Dapatkan **Sertifikat Spacetime** saat bertahan menghadapi *High G-Force*.
+- **Spacetime Duet (WebRTC)**: Hubungi teman *peer-to-peer* dan biarkan mereka menonton distorsi Anda dari zona "waktu normal".
 
 ---
 
-## Arsitektur & Tumpukan Teknologi (Tech Stack)
+## Pembahasan Teknis & Bugfixes
 
-| Domain | Teknologi | Fungsi |
-|--------|-----------|---------|
-| **Core** | React 18 + Vite + TypeScript | Kerangka antarmuka pengguna, state management, dan hot-reloading. |
-| **Graphics** | Three.js + GLSL WebGL 2.0 | Akselerasi perangkat keras untuk manipulasi piksel secara matematis pada video. |
-| **AI / Vision**| TensorFlow.js (MediaPipe) | Melacak koordinat geometris 468 titik wajah di memori CPU secara paralel. |
-| **Audio** | Web Audio API | Modulasi sinyal digital (DSP) dan node routing (Mic -> Filter -> Delay -> Destination). |
-| **Networking**| PeerJS (WebRTC) | Menembus NAT untuk streaming media langsung antar browser tanpa server penengah. |
-| **UI/UX** | CSS3 Murni + Orbitron | Rendering HUD Sci-Fi organik tanpa menggunakan library berat seperti Tailwind. |
+- **Mencegah GPU Context Starvation**: AI TensorFlow.js dipaksa berjalan pada *backend CPU* (WASM) untuk FaceMesh. GPU 100% didedikasikan untuk komputasi berat 16K+ Vertex WebGL secara simultan pada 60FPS.
+- **Hardware-Accelerated VideoTexture**: Menggunakan pemetaan `THREE.VideoTexture` murni dengan `LinearFilter` dan `SRGBColorSpace` untuk mem-bypass macetnya GPU *driver* Windows ketika mendeteksi *NPOT (Non-Power Of Two) Textures*.
+- **Cinematic Shake Math**: Bukannya menggunakan CSS animasi yang datar, goncangan layar dilakukan dengan matematika murni pada `camera.position.x/y` di Three.js yang memberikan guncangan *depth* realistis.
 
 ---
 
-## Pembahasan Teknis & Solusi Tingkat Lanjut (Bugfixes)
-
-Selama proses pengembangan, sistem ini melewati serangkaian penyesuaian arsitektur yang sangat ekstrim untuk mengakali limitasi keamanan dan efisiensi browser modern:
-
-1. **Mem-bypass Pemblokiran Video (Throttling) Chrome/Edge**
-   Browser modern sangat agresif "membunuh" tag `<video>` yang tersembunyi (`display: none` atau `opacity: 0`). Ini sebelumnya menyebabkan shader WebGL kami membeku total.
-   **Solusi:** Kami tetap me-render tag video asli dengan `opacity: 1` (terlihat 100%) seukuran layar penuh, namun kami mengakali susunannya (`z-index: 1`). WebGL Canvas (`z-index: 2`) kemudian diletakkan tepat menimpanya. Alhasil, browser "mengira" video sedang ditonton oleh manusia, dan suplai frame ke GPU tidak pernah diputus.
-
-2. **Mencegah GPU Context Starvation (Crash)**
-   Three.js dan TensorFlow.js sama-sama memonopoli *WebGL Backend* secara default. Menggabungkan keduanya menyebabkan GPU Context terputus dan aplikasi *hang*.
-   **Solusi:** Model AI TensorFlow dipaksa pindah ke *backend CPU*. Mengingat kami hanya butuh 5-10 FPS kalkulasi matriks untuk deteksi jarak, CPU modern sangat mampu menangani FaceMesh sambil membiarkan 100% tenaga GPU murni digunakan oleh Three.js untuk merender shader 60 FPS yang sangat berat.
-
-3. **Perbaikan Layar Hitam (NPOT Textures)**
-   Secara default, tekstur kamera (misal `640x480`) bukan termasuk dalam ukuran *Power of Two* (seperti `512x512` atau `1024x1024`). Driver GPU bawaan Windows sering mogok diam-diam saat memproses tekstur ini ke WebGL.
-   **Solusi:** Mengimplementasikan fitur *Hardware Accelerated* `THREE.VideoTexture` murni, dikombinasikan secara paksa dengan konfigurasi `generateMipmaps = false` serta `THREE.SRGBColorSpace` untuk menjamin stabilitas driver.
-
-4. **Operasi Boolean Paralel GPU**
-   Menulis `if(condition)` atau fungsi boolean di dalam fungsi inti GLSL menyebabkan crash *driver* tersembunyi.
-   **Solusi:** Merombak total seluruh logika boolean menjadi perkalian matematika murni menggunakan fungsi `step()` dan `clamp()`, yang sangat efisien dijalankan secara masif-paralel oleh *compute cores* pada GPU.
-
----
-
-## Instalasi & Menjalankan Aplikasi
+## Instalasi & Menjalankan
 
 1. **Clone repositori ini:**
    ```bash
    git clone <repo-url>
    cd WrapFaceAI
    ```
-
-2. **Instal seluruh *dependencies*:**
+2. **Instal seluruh dependencies:**
    ```bash
    npm install
    ```
-
-3. **Jalankan *Development Server*:**
+3. **Jalankan server:**
    ```bash
    npm run dev
    ```
-   *Buka `http://localhost:5173` di browser. Pastikan browser Anda mengizinkan akses Kamera & Mikrofon.*
-
-4. **Kompilasi ke *Production*:**
+4. **Kompilasi produksi:**
    ```bash
    npm run build
    ```
 
----
-*Dikembangkan secara khusus sebagai demonstrasi fusi tingkat lanjut antara model Kecerdasan Buatan dan Grafika Komputer (Computer Graphics).*
+*Pastikan browser Anda mengizinkan akses Kamera & Mikrofon untuk simulasi Doppler!*
