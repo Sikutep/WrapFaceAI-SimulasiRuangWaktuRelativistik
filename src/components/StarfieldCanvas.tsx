@@ -60,11 +60,11 @@ export function StarfieldCanvas({ speed }: StarfieldCanvasProps) {
       ctx.fillStyle = `rgba(5, 5, 5, ${fadeAlpha})`;
       ctx.fillRect(0, 0, w, h);
 
-      // Star speed scales exponentially
-      const starSpeed = 1 + spd * spd * 60;
+      // Star speed scales exponentially (Extreme Warp)
+      const starSpeed = 1 + Math.pow(spd, 4) * 800; // Ridiculous speed at 0.99c
 
       for (const star of stars) {
-        // Store previous projected position
+        // Store previous projected position for streaks
         star.prevX = (star.x / star.z) * 300 + cx;
         star.prevY = (star.y / star.z) * 300 + cy;
 
@@ -86,34 +86,25 @@ export function StarfieldCanvas({ speed }: StarfieldCanvasProps) {
 
         // Size based on depth
         const size = Math.max(0.5, (1 - star.z / 1500) * 3);
+        const brightness = Math.min(1, (1 - star.z / 1500) * 2.0);
 
-        // Brightness
-        const brightness = Math.min(1, (1 - star.z / 1500) * 1.5);
-
-        if (spd > 0.2) {
-          // Draw STREAKS (hyperspace effect)
-          const streakLength = Math.min(
-            Math.sqrt((px - star.prevX) ** 2 + (py - star.prevY) ** 2),
-            200
-          );
-
-          if (streakLength > 1) {
-            ctx.beginPath();
-            ctx.moveTo(star.prevX, star.prevY);
-            ctx.lineTo(px, py);
-            
-            // Color shifts from white → blue → cyan at high speed
-            const hue = 200 + spd * 40;
-            const sat = Math.min(100, spd * 150);
-            ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${70 + brightness * 30}%, ${brightness * 0.8})`;
-            ctx.lineWidth = size * (1 + spd);
-            ctx.stroke();
-          }
+        if (spd > 0.1) {
+          // EXTREME HYPERSPACE STREAKS
+          ctx.beginPath();
+          ctx.moveTo(star.prevX, star.prevY);
+          ctx.lineTo(px, py);
+          
+          // Color shifts from white → blue → cyan → purple
+          const hue = 200 + spd * 100;
+          const sat = Math.min(100, spd * 200);
+          ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${70 + brightness * 30}%, ${brightness * 0.9})`;
+          ctx.lineWidth = size * (1.0 + spd * 3.0);
+          ctx.stroke();
         } else {
           // Draw dots (stationary stars)
           ctx.beginPath();
           ctx.arc(px, py, size, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(200, 220, 255, ${brightness * 0.7})`;
+          ctx.fillStyle = `rgba(200, 220, 255, ${brightness * 0.8})`;
           ctx.fill();
         }
       }

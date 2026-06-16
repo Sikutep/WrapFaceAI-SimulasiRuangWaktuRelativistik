@@ -31,129 +31,99 @@ const FRAGMENT_SHADER = `
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
   }
 
-  float inBounds(vec2 c) {
-    vec2 s = step(0.0, c) * step(c, vec2(1.0));
-    return s.x * s.y;
-  }
-
   void main() {
     vec2 uv = vUv;
     float spd = uSpeed;
     float t = uTime;
     vec2 center = uv - 0.5;
 
-    // 1) LORENTZ CONTRACTION + WORMHOLE
-    float squeeze = 1.0 / uGamma;
-    center.x /= max(squeeze, 0.01);
-    float warpPower = spd * spd * 0.6;
+    // 1) EXTREME LORENTZ CONTRACTION + WORMHOLE WARP
+    // As spd approaches 1.0, the squeeze becomes infinite.
+    // We'll map spd (0 to 0.99) to a massive horizontal squeeze.
+    float squeezePower = pow(spd, 4.0) * 8.0; // Up to 8x squeeze
+    center.x *= (1.0 + squeezePower);
+    
+    // Radial warp (Wormhole edge bending)
     float r = length(center);
-    float warpFactor = 1.0 + warpPower * r * r;
-    warpFactor += sin(t * 3.0) * spd * spd * 0.02;
+    float warpPower = pow(spd, 3.0) * 2.0;
+    float warpFactor = 1.0 - (r * r * warpPower);
     center *= warpFactor;
-    center.y *= 1.0 + spd * spd * 0.15;
+    
+    // Vertical stretch (spaghettification)
+    center.y *= 1.0 - (pow(spd, 2.0) * 0.3);
+    
     vec2 warpedUv = center + 0.5;
 
-    // 2) CHROMATIC ABERRATION
-    float aberStrength = spd * spd * 0.035 + abs(uDoppler) * 0.02;
-    vec2 radialDir = normalize(warpedUv - 0.5 + vec2(0.0001));
-    float radialDist = length(warpedUv - 0.5);
-    vec2 redUv   = warpedUv + radialDir * aberStrength * radialDist;
+    // 2) RELATIVISTIC CHROMATIC ABERRATION (Neon Doppler)
+    // Blue shifts INWARD, Red shifts OUTWARD
+    float aberStrength = pow(spd, 3.0) * 0.15; // Extreme color separation at high speed
+    
+    vec2 redCenter = center * (1.0 - aberStrength); // Pull inwards
+    vec2 blueCenter = center * (1.0 + aberStrength); // Push outwards
+    
+    vec2 redUv = redCenter + 0.5;
     vec2 greenUv = warpedUv;
-    vec2 blueUv  = warpedUv - radialDir * aberStrength * radialDist;
+    vec2 blueUv = blueCenter + 0.5;
 
-    vec4 redSample   = texture2D(tDiffuse, clamp(redUv,   0.0, 1.0));
+    // Sample textures with edge clamping/black out
+    vec4 redSample = texture2D(tDiffuse, clamp(redUv, 0.0, 1.0));
     vec4 greenSample = texture2D(tDiffuse, clamp(greenUv, 0.0, 1.0));
-    vec4 blueSample  = texture2D(tDiffuse, clamp(blueUv,  0.0, 1.0));
+    vec4 blueSample = texture2D(tDiffuse, clamp(blueUv, 0.0, 1.0));
 
-    float redMask   = inBounds(redUv);
-    float greenMask = inBounds(greenUv);
-    float blueMask  = inBounds(blueUv);
+    // Masking to make edges black if UVs go out of bounds
+    float redMask = step(0.0, redUv.x) * step(redUv.x, 1.0) * step(0.0, redUv.y) * step(redUv.y, 1.0);
+    float greenMask = step(0.0, greenUv.x) * step(greenUv.x, 1.0) * step(0.0, greenUv.y) * step(greenUv.y, 1.0);
+    float blueMask = step(0.0, blueUv.x) * step(blueUv.x, 1.0) * step(0.0, blueUv.y) * step(blueUv.y, 1.0);
 
     vec3 color = vec3(
-      redSample.r   * redMask,
+      redSample.r * redMask,
       greenSample.g * greenMask,
-      blueSample.b  * blueMask
+      blueSample.b * blueMask
     );
+
     float isVisible = max(redMask, max(greenMask, blueMask));
 
-    // 3) DOPPLER TINTING
-    float totalDoppler = spd * 0.6 + uDoppler * 0.8;
-    vec3 blueTint = vec3(0.15, 0.3, 0.9);
-    vec3 redTint  = vec3(0.9, 0.2, 0.05);
-    float tintStrength = abs(totalDoppler) * 0.4;
+    // 3) NEON DOPPLER TINTING
+    // Overdrive the colors to look like a sci-fi neon interface
+    float totalDoppler = spd * 0.8 + uDoppler;
+    vec3 blueTint = vec3(0.0, 0.5, 1.0);
+    vec3 redTint  = vec3(1.0, 0.1, 0.0);
     vec3 tint = mix(redTint, blueTint, clamp(totalDoppler + 0.5, 0.0, 1.0));
-    color = mix(color, color + tint * tintStrength, min(spd * 1.5, 1.0) * isVisible);
-    float lum = dot(color, vec3(0.299, 0.587, 0.114));
-    color = mix(vec3(lum), color, 1.0 + spd * 0.8);
+    
+    float tintStrength = pow(spd, 2.0) * 0.8;
+    color = mix(color, color + (tint * color) * 2.0, tintStrength * isVisible);
+    
+    // Add brightness/bloom at extreme speeds
+    color += tint * pow(spd, 6.0) * 1.5 * isVisible;
 
-    // 4) BLOOM
-    float bloom = smoothstep(0.4, 0.9, lum) * spd * 0.6 * isVisible;
-    vec3 bloomColor = mix(vec3(0.0, 0.6, 1.0), vec3(0.6, 0.0, 1.0), spd);
-    color += bloomColor * bloom;
-
-    // 5) HYPERSPACE STREAKS
-    float streakPower = smoothstep(0.25, 0.99, spd);
-    streakPower *= streakPower;
-    if (streakPower > 0.0) {
-      vec2 sc = vUv - 0.5;
-      float angle = atan(sc.y, sc.x);
-      float dist = length(sc);
-      float streaks = 0.0;
-      for (float i = 0.0; i < 4.0; i += 1.0) {
-        float sp = 1.5 + i * 0.8;
-        float den = 25.0 + i * 15.0;
-        float line = smoothstep(0.97, 1.0, sin(angle * den + t * sp));
-        float radFade = smoothstep(0.02, 0.35 + spd * 0.2, dist);
-        streaks += line * radFade;
-      }
-      vec3 streakColor = mix(vec3(0.4, 0.7, 1.0), vec3(1.0), streakPower * 0.7);
-      color += streakColor * streaks * streakPower * 0.5;
-    }
-
-    // 6) VIGNETTE
-    float vigStrength = 0.3 + spd * 1.2;
-    vec2 vigUv = vUv - 0.5;
-    float vig = 1.0 - dot(vigUv, vigUv) * vigStrength * 2.5;
-    vig = clamp(vig, 0.0, 1.0);
-    vec3 vigColor = mix(vec3(0.0), vec3(0.0, 0.02, 0.08), spd);
-    color = mix(vigColor, color, vig);
-
-    // 7) SCANLINES
-    float scanFreq = uResolution.y * 1.2;
-    float scan = sin(vUv.y * scanFreq + t * 2.0) * 0.5 + 0.5;
-    scan = mix(1.0, scan, 0.06 + spd * 0.08);
-    color *= scan;
-
-    // 8) VOID GLOW
+    // 4) VOID GLOW (Event Horizon edge glow)
     float voidGlow = (1.0 - isVisible);
     if (voidGlow > 0.0) {
-      vec2 edgeDist = abs(warpedUv - 0.5);
-      float edgeFactor = max(edgeDist.x, edgeDist.y) - 0.5;
-      float glow = exp(-edgeFactor * 8.0) * spd;
-      vec3 boundaryColor = mix(
-        vec3(0.0, 0.8, 1.0), vec3(0.7, 0.0, 1.0),
-        sin(t * 2.0 + atan(warpedUv.y - 0.5, warpedUv.x - 0.5)) * 0.5 + 0.5
-      );
-      color += boundaryColor * glow * 0.7 * voidGlow;
+      float glowPower = exp(-length(center) * 4.0) * spd * 2.0;
+      vec3 boundaryColor = mix(vec3(0.0, 1.0, 1.0), vec3(1.0, 0.0, 1.0), sin(t * 5.0) * 0.5 + 0.5);
+      color += boundaryColor * glowPower;
     }
 
-    // 9) GLITCH
-    if (spd > 0.6) {
-      float glitchChance = hash(vec2(floor(t * 20.0), floor(vUv.y * 40.0)));
-      if (glitchChance > 0.97) {
-        float offset = (hash(vec2(t, vUv.y)) - 0.5) * 0.05 * spd;
+    // 5) HIGH-SPEED SCANLINES & GLITCH
+    float scanFreq = uResolution.y * 1.5;
+    float scan = sin(vUv.y * scanFreq - t * 10.0) * 0.5 + 0.5;
+    color *= mix(1.0, scan, pow(spd, 2.0) * 0.3);
+
+    if (spd > 0.8) {
+      float glitchChance = hash(vec2(floor(t * 30.0), floor(vUv.y * 50.0)));
+      if (glitchChance > 0.95) {
+        float offset = (hash(vec2(t, vUv.y)) - 0.5) * 0.1 * spd;
         vec2 glitchUv = clamp(warpedUv + vec2(offset, 0.0), 0.0, 1.0);
         color.rgb = texture2D(tDiffuse, glitchUv).rgb;
-        color.rgb += vec3(0.0, 0.3, 0.5) * spd * 0.3;
+        color.rgb += vec3(0.0, 1.0, 0.5) * 0.5; // Neon green flash
       }
     }
 
-    // 10) GRAIN
-    float grain = hash(vUv * t * 137.0) * 0.04 * spd;
+    // 6) FILM GRAIN
+    float grain = hash(vUv * t * 200.0) * 0.08 * spd;
     color += vec3(grain);
 
-    color = clamp(color, 0.0, 1.0);
-    gl_FragColor = vec4(color, 1.0);
+    gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
   }
 `;
 

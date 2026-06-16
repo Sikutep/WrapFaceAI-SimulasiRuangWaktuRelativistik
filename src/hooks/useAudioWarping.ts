@@ -86,11 +86,10 @@ export function useAudioWarping(isReady: boolean, dopplerFactor: number, speed: 
     };
   }, [isReady, stream]);
 
-  // === UPDATE AUDIO EFFECTS EVERY RENDER ===
   useEffect(() => {
     const ctx = audioCtxRef.current;
     if (!ctx || !filterRef.current || !delayRef.current || !feedbackRef.current) return;
-    if (!oscillatorRef.current || !oscGainRef.current) return;
+    if (!oscillatorRef.current || !oscGainRef.current || !gainRef.current) return;
 
     const t = ctx.currentTime;
     const filter = filterRef.current;
@@ -98,46 +97,56 @@ export function useAudioWarping(isReady: boolean, dopplerFactor: number, speed: 
     const feedback = feedbackRef.current;
     const osc = oscillatorRef.current;
     const oscGain = oscGainRef.current;
+    const masterGain = gainRef.current;
 
-    // --- DOPPLER AUDIO SHIFT ---
+    // --- DOPPLER AUDIO SHIFT (Extreme) ---
     if (dopplerFactor > 0.05) {
-      // BLUESHIFT — moving toward camera → high pitch, tinny
       filter.type = 'highpass';
-      filter.frequency.setTargetAtTime(800 + dopplerFactor * 4000, t, 0.08);
-      filter.Q.setTargetAtTime(5 + dopplerFactor * 15, t, 0.08);
+      filter.frequency.setTargetAtTime(1000 + dopplerFactor * 5000, t, 0.05);
+      filter.Q.setTargetAtTime(10 + dopplerFactor * 20, t, 0.05);
     } else if (dopplerFactor < -0.05) {
-      // REDSHIFT — moving away → deep, muffled, bassy
       filter.type = 'lowpass';
-      filter.frequency.setTargetAtTime(600 - Math.abs(dopplerFactor) * 400, t, 0.08);
-      filter.Q.setTargetAtTime(3 + Math.abs(dopplerFactor) * 8, t, 0.08);
+      filter.frequency.setTargetAtTime(400 - Math.abs(dopplerFactor) * 300, t, 0.05);
+      filter.Q.setTargetAtTime(5 + Math.abs(dopplerFactor) * 15, t, 0.05);
     } else {
-      // Neutral
       filter.type = speed > 0.5 ? 'bandpass' : 'allpass';
       if (speed > 0.5) {
-        filter.frequency.setTargetAtTime(1200, t, 0.1);
-        filter.Q.setTargetAtTime(1 + speed * 3, t, 0.1);
+        filter.frequency.setTargetAtTime(1500, t, 0.1);
+        filter.Q.setTargetAtTime(2 + speed * 5, t, 0.1);
       }
     }
 
-    // --- SPACE ECHO (increases with speed) ---
-    if (speed > 0.3) {
-      const echoStrength = (speed - 0.3) / 0.7; // 0..1
-      delay.delayTime.setTargetAtTime(0.08 + echoStrength * 0.25, t, 0.1);
-      feedback.gain.setTargetAtTime(0.2 + echoStrength * 0.5, t, 0.1);
+    // --- EXTREME SPACE ECHO ---
+    if (speed > 0.2) {
+      const echoStrength = (speed - 0.2) / 0.8;
+      delay.delayTime.setTargetAtTime(0.1 + echoStrength * 0.4, t, 0.1);
+      feedback.gain.setTargetAtTime(0.3 + echoStrength * 0.65, t, 0.1);
     } else {
       delay.delayTime.setTargetAtTime(0.0, t, 0.1);
       feedback.gain.setTargetAtTime(0.0, t, 0.1);
     }
 
-    // --- ENGINE HUM (deep rumble at high speed) ---
-    if (speed > 0.2) {
-      const humPower = (speed - 0.2) / 0.8;
-      // Frequency rises with speed: 40Hz → 120Hz (deep → aggressive)
-      osc.frequency.setTargetAtTime(40 + humPower * 80, t, 0.1);
-      // Volume scales with speed²
-      oscGain.gain.setTargetAtTime(humPower * humPower * 0.12, t, 0.1);
+    // --- ENGINE HUM (Deep rumble to screaming pitch) ---
+    if (speed > 0.1) {
+      const humPower = (speed - 0.1) / 0.9;
+      // 40Hz deep rumble -> 300Hz scream
+      osc.frequency.setTargetAtTime(40 + Math.pow(humPower, 3) * 260, t, 0.1);
+      oscGain.gain.setTargetAtTime(Math.pow(humPower, 2) * 0.2, t, 0.1);
     } else {
       oscGain.gain.setTargetAtTime(0.0, t, 0.1);
+    }
+
+    // --- STUTTER / GLITCH EFFECT (Real-time Tremolo) ---
+    if (speed > 0.8) {
+      // Rapid volume modulation
+      const stutterRate = 20.0 + (speed - 0.8) * 100.0; // 20Hz to 40Hz flutter
+      const lfo = Math.sin(t * stutterRate * Math.PI * 2);
+      // Map -1..1 to 0..1, then mix with 1.0 based on speed
+      const stutterDepth = (speed - 0.8) / 0.2; // 0..1
+      const stutterVal = 1.0 - (stutterDepth * 0.8 * (0.5 - lfo * 0.5));
+      masterGain.gain.setTargetAtTime(stutterVal, t, 0.02);
+    } else {
+      masterGain.gain.setTargetAtTime(1.0, t, 0.1);
     }
 
   }, [dopplerFactor, speed]);
