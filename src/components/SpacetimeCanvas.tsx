@@ -8,10 +8,26 @@ interface SpacetimeCanvasProps {
 }
 
 const VERTEX_SHADER = `
+  uniform float uSpeed;
   varying vec2 vUv;
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec3 newPosition = position;
+    
+    // Calculate normalized distance from center using UV
+    float dist = length(uv - 0.5) * 2.0;
+    
+    if (uSpeed > 0.0) {
+      // 1. Cinematic Z-Warp (Push center into deep screen)
+      float warpFactor = pow(uSpeed, 3.0) * 800.0;
+      newPosition.z -= (1.0 / (dist + 0.2)) * warpFactor;
+      
+      // 2. Physical 3D Lorentz Contraction
+      float contraction = sqrt(1.0 - pow(uSpeed, 2.0));
+      newPosition.x *= contraction;
+    }
+    
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
   }
 `;
 
@@ -104,6 +120,11 @@ const FRAGMENT_SHADER = `
       color += boundaryColor * glowPower;
     }
 
+    // 4.5) GRAVITATIONAL SHADOW (Vignette)
+    float distSq = dot(center, center);
+    float vignette = smoothstep(0.5, 0.1, distSq * (0.5 + pow(spd, 2.0) * 3.0));
+    color *= mix(1.0, vignette, spd);
+
     // 5) HIGH-SPEED SCANLINES & GLITCH
     float scanFreq = uResolution.y * 1.5;
     float scan = sin(vUv.y * scanFreq - t * 10.0) * 0.5 + 0.5;
@@ -181,10 +202,14 @@ export function SpacetimeCanvas({ speed, dopplerFactor, stream }: SpacetimeCanva
 
       console.log('[SpacetimeCanvas] Container:', w, 'x', h);
 
-      // Standard Orthographic Setup mapped 1:1 to pixels
+      // Use PerspectiveCamera to correctly render the Z-Warp depth
+      const fov = 45;
       const scene = new THREE.Scene();
-      const camera = new THREE.OrthographicCamera(w / -2, w / 2, h / 2, h / -2, 1, 1000);
-      camera.position.z = 100;
+      const camera = new THREE.PerspectiveCamera(fov, w / h, 1, 4000);
+      
+      // Calculate distance to perfectly fit the plane of size (w, h)
+      const d = (h / 2) / Math.tan((fov * Math.PI / 180) / 2);
+      camera.position.z = d;
 
       renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
       renderer.setSize(w, h);
@@ -213,8 +238,8 @@ export function SpacetimeCanvas({ speed, dopplerFactor, stream }: SpacetimeCanva
         transparent: true
       });
 
-      // Plane matches pixel dimensions of container
-      const geometry = new THREE.PlaneGeometry(w, h);
+      // Dense Mesh 128x128 for high-quality vertex bending
+      const geometry = new THREE.PlaneGeometry(w, h, 128, 128);
       const plane = new THREE.Mesh(geometry, material);
       scene.add(plane);
 
@@ -226,14 +251,15 @@ export function SpacetimeCanvas({ speed, dopplerFactor, stream }: SpacetimeCanva
         if (nw === 0 || nh === 0) return;
         
         renderer.setSize(nw, nh);
-        camera.left = nw / -2;
-        camera.right = nw / 2;
-        camera.top = nh / 2;
-        camera.bottom = nh / -2;
+        camera.aspect = nw / nh;
         camera.updateProjectionMatrix();
         
+        // Recalculate distance to fit plane
+        const newD = (nh / 2) / Math.tan((fov * Math.PI / 180) / 2);
+        camera.position.z = newD;
+        
         plane.geometry.dispose();
-        plane.geometry = new THREE.PlaneGeometry(nw, nh);
+        plane.geometry = new THREE.PlaneGeometry(nw, nh, 128, 128);
         material.uniforms.uResolution.value.set(nw, nh);
       });
       ro.observe(container);
@@ -257,6 +283,16 @@ export function SpacetimeCanvas({ speed, dopplerFactor, stream }: SpacetimeCanva
         material.uniforms.uGamma.value = g;
         material.uniforms.uDoppler.value = d;
         material.uniforms.uTime.value = performance.now() / 1000;
+
+        // Cinematic Camera Shake
+        if (s > 0.85) {
+          const shakeIntensity = Math.pow(s - 0.85, 2) * 500.0;
+          camera.position.x = (Math.random() - 0.5) * shakeIntensity;
+          camera.position.y = (Math.random() - 0.5) * shakeIntensity;
+        } else {
+          camera.position.x = 0;
+          camera.position.y = 0;
+        }
 
         renderer!.render(scene, camera);
       }
